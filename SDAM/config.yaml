@@ -1,0 +1,4 @@
+ENV:
+  SAVE_DIR: "C:/Users/HoHeon/Downloads/SDAM_RESULTS"
+DART:
+  KEY: "b34dba1d3305ded5cf8022dab7ac5fe90c867e8b"
