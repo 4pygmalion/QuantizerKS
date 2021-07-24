@@ -3,4 +3,12 @@
 - yaml
 - pandas
 - numpy
-- bs
+- beautifulsoap4
+- xmltodict 
+
+
+### how to install
+`bash 
+$ python -m pip install build
+$ python setup.py
+`
