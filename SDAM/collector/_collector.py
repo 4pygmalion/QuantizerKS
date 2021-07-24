@@ -31,8 +31,10 @@ class DART(object):
 
     def __init__(self, config):
         self.config = config
+        self.mapper = config['DART']['MAPPER']
         self.cert = f"crtfc_key={config['DART']['KEY']}"
         self.cope_code_map = self._get_corpcode()   
+
 
     def _get_corpcode(self) -> list:
         ''' Get XML file from DART API and parse it
@@ -67,7 +69,11 @@ class DART(object):
         return json.loads(result)
 
 
-    def get_finance_sheet_from_dart(self, corp_name:str, year:int, quarter:int, doctype :str ='CFS'):
+    def get_finance_sheet_from_dart(self, 
+    corp_name:str, 
+    year:int, 
+    quarter:int, 
+    doctype :str ='CFS') -> list:
         '''
         Parameters
         ----------
@@ -85,10 +91,11 @@ class DART(object):
             defualt: CFS (연결재무재표)
 
 
-
         Return
         ------
-        None
+        list: 
+            0 index: header
+            
 
 
         '''
@@ -99,7 +106,7 @@ class DART(object):
         # Requested parameters
         corp_code = 'corp_code={}'.format(corp_code)
         bsns_year = 'bsns_year={}'.format(str(year))
-        report_code = 'reprt_code={}'.format(report_code)
+        report_code = 'reprt_code={}'.format(self.mapper[quarter])
         fs_div = 'fs_div={}'.format(doctype)
 
 
@@ -112,22 +119,28 @@ class DART(object):
             param = [self.cert, corp_code, bsns_year, report_code]
 
         target_URL = URL + '&'.join(param)
-        return target_URL
+
+        binary_txt = urlopen(target_URL).read()
+        return json.loads(binary_txt)['list']
+        
 
 
 if __name__ == "__main__":
     import os
     import sys
+    import yaml
 
-    COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
+    COLLECTOR_DIR = os.path.dirname(os.getcwd())
+    # COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
     ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
     
-
-    with open(os.path.join(ROOT_DIR, 'config.yaml')) as f:
+    with open('/Users/hoheon/Documents/repositories/SDAM/SDAM/config.yaml') as f:
+    # with open(os.path.join(ROOT_DIR, 'config.yaml')) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
     dart = DART(config)
-    a = dart.get_finance_sheet_from_dart("삼성전자", 2019, "11013", "11013")
+    a = dart.get_finance_sheet_from_dart("삼성전자", 2019, 1)
+    len(a)
     print(a)
 # print(type(a))
 # # print(a[0])

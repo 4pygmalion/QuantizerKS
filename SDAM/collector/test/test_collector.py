@@ -36,7 +36,10 @@ def test_search_corp_code(dart_collector, corp_names, expecteds):
 
 
 @pytest.mark.parametrize(
-    "corp_name, year, report_code, doctype, expecteds"
-    [pytest.param("고려아연", 2020, 11013, "CFS", )]
+    "corp_name, year, quarter, doctype",
+    [pytest.param("삼성전자", 2019, 1, "CFS")]
 )
-def test_get_finantial_sheet(dart_collector, corp_name, year, report_code, doctype)
+def test_get_finantial_sheet(dart_collector, corp_name, year, quarter, doctype):
+    with open(os.path.join(TEST_DIR, 'data/samsung_2019_1Q.txt')) as f:
+        expected = f.readlines()
+    assert expected == dart_collector.get_finance_sheet_from_dart(corp_name, year, quarter, doctype)
