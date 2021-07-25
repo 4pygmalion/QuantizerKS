@@ -5,5 +5,7 @@ DART:
     2: 11012
     3: 11014
     4: 11011
+DATA:
+  MARKET: data/corp_list.csv
 ENV:
   SAVE_DIR: /Users/hoheon/Documents/repositories/SDAM/strategies/results

@@ -3,7 +3,7 @@ import sys
 import json
 import xmltodict
 import numpy as np
-import pandas as np
+import pandas as pd
 
 from io import BytesIO
 from zipfile import ZipFile
@@ -43,7 +43,7 @@ class DART(object):
         self.config = config
         self.mapper = config['DART']['MAPPER']
         self.cert = f"crtfc_key={config['DART']['KEY']}"
-        self.cope_code_map = self._get_corpcode()   
+        self.cope_code_map = self.get_listed_corp()   
         self.is_consolidation = is_consolidation
 
 
@@ -67,7 +67,7 @@ class DART(object):
             corp_xml =  xmltodict.parse(corpcode_xml.read())
         return corp_xml['result']['list']
     
-    def get_listed_corp(self) -> dict:
+    def get_listed_corp(self, market:list = ['KOSPI', 'KOSDAQ']) -> dict:
         ''' 상장된 기업의 기업명, 종목코드를 반환합니다.
         
         Return
@@ -79,19 +79,32 @@ class DART(object):
         ----
         장외거래시장도 있는 것 같음
         '''
+        
+        data = pd.read_csv(os.path.join(COLLECTOR_DIR, 
+                            self.config['DATA']['MARKET']),
+                            encoding='cp949')
+        # data['단축코드'] = 
+        data = data.loc[data['시장구분'].isin(market)]
+        data['단축코드'] = data['단축코드'].apply(lambda x: "{:06}".format((int(x))) \
+                                            if sum([char.isalpha() for char in x]) == 0 \
+                                            else str(x))
+                    
         listing_corps = dict()
         for corp_info in self._get_corpcode():
-            if corp_info['stock_code']:
-                listing_corps[corp_info['corp_name']] = corp_info['stock_code']
-        
+            if not corp_info['stock_code']:
+                continue
+            if corp_info['stock_code'] in list(data['단축코드']):
+                listing_corps[corp_info['corp_name']] = {'dart_code':corp_info['corp_code'],
+                                                        'stock_code':corp_info['stock_code']}
         return listing_corps
 
     
 
-    def search_corp_code(self, corp_name:str) -> str:
-        for element in self.cope_code_map:
-            if element['corp_name'] == corp_name:
-                return element['corp_code']
+    # def search_corp_code(self, corp_name:str) -> str:
+    #     self.cope_code_map[corp_name]
+    #     for element in self.cope_code_map:
+    #         if element['corp_name'] == corp_name:
+    #             return element['corp_code']
 
 
     def get_finance_sheet_from_dart(self, 
@@ -114,11 +127,8 @@ class DART(object):
         None
         '''
 
-
-        corp_code = self.search_corp_code(corp_name)
-        
         # Requested parameters
-        corp_code = 'corp_code={}'.format(corp_code)
+        corp_code = 'corp_code={}'.format(self.cope_code_map[corp_name]['dart_code'])
         bsns_year = 'bsns_year={}'.format(str(year))
         report_code = 'reprt_code={}'.format(self.mapper[quarter])
         fs_div = 'fs_div={}'.format(doctype)
@@ -227,9 +237,9 @@ if __name__ == "__main__":
     import os
     import sys
     import yaml
-
-    COLLECTOR_DIR = os.path.dirname(os.getcwd())
-    # COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
+    import pandas as pd
+    # COLLECTOR_DIR = os.path.dirname(os.getcwd())
+    COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
 
     ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
     
@@ -240,5 +250,5 @@ if __name__ == "__main__":
     dart = DART(config)
     a = dart.get_listed_corp()
 
-    a
+    print(a)
  
