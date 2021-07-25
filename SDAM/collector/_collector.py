@@ -67,6 +67,26 @@ class DART(object):
             corp_xml =  xmltodict.parse(corpcode_xml.read())
         return corp_xml['result']['list']
     
+    def get_listed_corp(self) -> dict:
+        ''' 상장된 기업의 기업명, 종목코드를 반환합니다.
+        
+        Return
+        ------
+        dict: (corp_name, corp_code).  
+            corp_name, corp_code are string type.
+
+        Note
+        ----
+        장외거래시장도 있는 것 같음
+        '''
+        listing_corps = dict()
+        for corp_info in self._get_corpcode():
+            if corp_info['stock_code']:
+                listing_corps[corp_info['corp_name']] = corp_info['stock_code']
+        
+        return listing_corps
+
+    
 
     def search_corp_code(self, corp_name:str) -> str:
         for element in self.cope_code_map:
@@ -83,23 +103,15 @@ class DART(object):
         Parameters
         ----------
         year: 회계년도.
-
-        report_code: int. in range from 1, to 4
-
+        report_code: int. 
+            in range from 1, to 4
         doctype: str.
-            'CFS':  연결
-            'IS' 손익계산서
-            'IS: Income statetment
-            defualt: CFS (연결재무재표)
-
+            'CFS':  연결재무재표 (Consolidated Finantial Statement)
+            'IS' 손익계산서 (Income statetment)
 
         Return
         ------
-        list: 
-            0 index: header
-            
-
-
+        None
         '''
 
 
@@ -142,28 +154,91 @@ class DART(object):
         # for each account name (각 계정명에 대해서 자산을 찾음)
         for item in self.account_sets:
             if asset_name == item['account_nm'] :
-                return item['thstrm_amount']
+                return int(item['thstrm_amount'])
         
         raise AccountNotFound(f"{asset_name} was not founded in finantial sheet")
 
 
 
-# if __name__ == "__main__":
-#     import os
-#     import sys
-#     import yaml
+class MarketValueCollector(object):
+    '''Market Value Data collecter from NAVER finance
 
-#     COLLECTOR_DIR = os.path.dirname(os.getcwd())
-#     COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
-
-#     ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
+    Parameters
+    ----------
+    corp_code: '014680'
+    '''
     
-#     with open('/Users/hoheon/Documents/repositories/SDAM/SDAM/config.yaml') as f:
-#     # with open(os.path.join(ROOT_DIR, 'config.yaml')) as f:
-#         config = yaml.load(f, Loader=yaml.FullLoader)
+    def __init__(self, corp_code:str):
+        self.corp_code = corp_code
+        self.bs_obj = self._get_html()
+        
+        if self._check_redirection():
+            raise ValueError("Ticker not existed")
+        
+    def _check_redirection(self):
+        '''To check rediction due to not existing ticker
+        
+        return
+        ------
+        bool
+        '''
+        return self.bs_obj.find('title').get_text() == '네이버 :: 세상의 모든 지식, 네이버'
+        
+    def _get_html(self):
+        '''Get html from naver stock using BS4 '''
 
-#     dart = DART(config)
-#     dart.get_finance_sheet_from_dart("삼성전자", 2019, 1)
-#     print("유동자산", dart.get_asset('유동자산'))
-#     print("아이스크림", dart.get_asset('김우유'))
+        URL = 'https://finance.naver.com/item/main.nhn?code={}'.format(self.corp_code)
+        html = urlopen(URL)
+        bs_obj = BeautifulSoup(html, "html.parser")      
+        
+        return bs_obj
+
+
+    def get_market_value(self, attr:str) -> int:
+        '''
+        Parameters
+        ----------
+            attr: str.
+                'price': 현재가격
+                'n_stock': 발행주식수
+                'market_value': 시가총액 
+        '''
+        if attr == 'price':
+            market_sum = self.bs_obj.find('p', attrs={'class': 'no_today'})
+            spans = market_sum.find_all('span')[1:]
+            csv = [tag.get_text() for tag in spans]
+            current_price = ''.join(csv)
+            current_price = int(current_price.replace(',', ''))
+            return current_price
+
+        elif attr == 'n_stocks':
+            q = self.bs_obj.find('th', text='상장주식수').next_sibling.next_sibling
+            q = q.get_text()
+            q = int(q.replace(',', ''))
+            return q
+
+        elif attr == 'market_value':
+            n_sum = self.get_market_value('price') * self.get_market_value('n_stocks')
+            return n_sum
+
+
+
+if __name__ == "__main__":
+    import os
+    import sys
+    import yaml
+
+    COLLECTOR_DIR = os.path.dirname(os.getcwd())
+    # COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
+
+    ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
+    
+    with open('/Users/hoheon/Documents/repositories/SDAM/SDAM/config.yaml') as f:
+    # with open(os.path.join(ROOT_DIR, 'config.yaml')) as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+
+    dart = DART(config)
+    a = dart.get_listed_corp()
+
+    a
  

@@ -16,7 +16,10 @@ def set_save_dir(dir):
     with open(config_path) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
+    currnet_path = config['ENV']['SAVE_DIR']
     config['ENV']['SAVE_DIR'] = dir
     with open(config_path, 'w') as f:
         yaml.dump(config, f)  
-        print(f"save dir was change with: {dir}")
+
+    if currnet_path != dir:
+        print(f"Save path was changed: {dir}")

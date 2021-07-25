@@ -6,4 +6,4 @@ DART:
     3: 11014
     4: 11011
 ENV:
-  SAVE_DIR: C:/Users/HoHeon/Downloads/SDAM_RESULTS
+  SAVE_DIR: /Users/hoheon/Documents/repositories/SDAM/strategies/results
