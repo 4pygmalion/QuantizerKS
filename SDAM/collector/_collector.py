@@ -10,6 +10,13 @@ from zipfile import ZipFile
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
 
+
+COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
+
+sys.path.append(ROOT_DIR)
+from error_handler import AccountNotFound
+
 class DART(object):
     '''
     The purpose of this class is to retrieve the financial information from DART
@@ -19,6 +26,8 @@ class DART(object):
     ----------
     cert_key: cert key (https://opendart.fss.or.kr/intro/main.do)
     corp_code : unique key in Open Dart (is not differ in stock code) **
+    is_consolidation: 연결 또는 별도 재무재표 여부
+        (default: True (연결))
 
     Example
     -------
@@ -29,11 +38,13 @@ class DART(object):
     >>> corp_dart.get_finance_sheet(start_date=2020, report_code=11013)
     '''
 
-    def __init__(self, config):
+    def __init__(self, config, is_consolidation = True):
+        
         self.config = config
         self.mapper = config['DART']['MAPPER']
         self.cert = f"crtfc_key={config['DART']['KEY']}"
         self.cope_code_map = self._get_corpcode()   
+        self.is_consolidation = is_consolidation
 
 
     def _get_corpcode(self) -> list:
@@ -63,12 +74,6 @@ class DART(object):
                 return element['corp_code']
 
 
-    def _URL_to_json(self, URL:str):
-        req = urlopen(URL)
-        result = req.read()
-        return json.loads(result)
-
-
     def get_finance_sheet_from_dart(self, 
     corp_name:str, 
     year:int, 
@@ -79,14 +84,11 @@ class DART(object):
         ----------
         year: 회계년도.
 
-        report_code: int
-            1분기보고서 : 11013
-            반기보고서 : 11012
-            3분기보고서 : 11014
-            사업보고서 : 11011
+        report_code: int. in range from 1, to 4
 
         doctype: str.
-            'CFS':  Consolidate Financial sheet
+            'CFS':  연결
+            'IS' 손익계산서
             'IS: Income statetment
             defualt: CFS (연결재무재표)
 
@@ -121,32 +123,47 @@ class DART(object):
         target_URL = URL + '&'.join(param)
 
         binary_txt = urlopen(target_URL).read()
-        return json.loads(binary_txt)['list']
+        self.account_sets =  json.loads(binary_txt)['list']  # list including dictionary
         
 
+    def get_asset(self, asset_name):
+        '''
+        계정명칭(예, 유동자산, 유동부채 등)에 해당하는 당기 금액을 반환합니다.
 
-if __name__ == "__main__":
-    import os
-    import sys
-    import yaml
+        Parameter
+        ---------
+        asset_name: str. 계정명칭
+            예) "유동자산"
 
-    COLLECTOR_DIR = os.path.dirname(os.getcwd())
-    # COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
-    ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
+        Return
+        ------
+        int: 계정명칭의 보고서내 당기금액
+        '''
+        # for each account name (각 계정명에 대해서 자산을 찾음)
+        for item in self.account_sets:
+            if asset_name == item['account_nm'] :
+                return item['thstrm_amount']
+        
+        raise AccountNotFound(f"{asset_name} was not founded in finantial sheet")
+
+
+
+# if __name__ == "__main__":
+#     import os
+#     import sys
+#     import yaml
+
+#     COLLECTOR_DIR = os.path.dirname(os.getcwd())
+#     COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
+
+#     ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
     
-    with open('/Users/hoheon/Documents/repositories/SDAM/SDAM/config.yaml') as f:
-    # with open(os.path.join(ROOT_DIR, 'config.yaml')) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
+#     with open('/Users/hoheon/Documents/repositories/SDAM/SDAM/config.yaml') as f:
+#     # with open(os.path.join(ROOT_DIR, 'config.yaml')) as f:
+#         config = yaml.load(f, Loader=yaml.FullLoader)
 
-    dart = DART(config)
-    a = dart.get_finance_sheet_from_dart("삼성전자", 2019, 1)
-    len(a)
-    print(a)
-# print(type(a))
-# # print(a[0])
-
-# for element in a['result']['list']:
-#     if element['corp_name'] == '고려아연':
-#         print(element)
-# import sys
-# sys.path.append('C:/Users/HoHeon/OneDrive/PythonProject/SDAM/collector')
+#     dart = DART(config)
+#     dart.get_finance_sheet_from_dart("삼성전자", 2019, 1)
+#     print("유동자산", dart.get_asset('유동자산'))
+#     print("아이스크림", dart.get_asset('김우유'))
+ 
