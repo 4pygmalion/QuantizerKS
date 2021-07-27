@@ -190,8 +190,8 @@ class MarketValueCollector(object):
         '''Get html from naver stock using BS4 '''
 
         URL = 'https://finance.naver.com/item/main.nhn?code={}'.format(self.corp_code)
-        html = urlopen(URL)
-        bs_obj = BeautifulSoup(html, "html.parser")      
+        res = urlopen(URL).read().decode('cp949')
+        bs_obj = BeautifulSoup(res, "html.parser")      
         
         return bs_obj
 
@@ -214,14 +214,10 @@ class MarketValueCollector(object):
             return current_price
 
         elif attr == 'n_stocks':
-            print(self.bs_obj)
-            q = self.bs_obj.find('th', text='상장주식수')
-            # print(q)
-            # print(q.next_sibling)
-            #.next_sibling
-            q = q.get_text()
-            q = int(q.replace(',', ''))
-            return q
+            div = self.bs_obj.find('table', attrs={"summary":'시가총액 정보'})
+            values = div.text.split("\n")
+            n_stock = values[values.index("상장주식수")+1]
+            return int(n_stock.replace(',', ''))
 
         elif attr == 'market_value':
             n_sum = self.get_market_value('price') * self.get_market_value('n_stocks')
@@ -233,18 +229,17 @@ if __name__ == "__main__":
     import os
     import sys
     import yaml
+    import re
     import pandas as pd
     # COLLECTOR_DIR = os.path.dirname(os.getcwd())
     COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
-
-    ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
+    SDAM_DIR = os.path.dirname(COLLECTOR_DIR)
     
-    with open('/Users/hoheon/Documents/repositories/SDAM/SDAM/config.yaml') as f:
-    # with open(os.path.join(ROOT_DIR, 'config.yaml')) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
+    
+    # with open(os.path.join(SDAM_DIR, 'config.yaml')) as f:
+        # config = yaml.load(f, Loader=yaml.FullLoader)
 
-    dart = DART(config)
-    a = dart.get_listed_corp()
-
+    mvc = MarketValueCollector("010130")
+    a = mvc.get_market_value("n_stocks")
     print(a)
  
