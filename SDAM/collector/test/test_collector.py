@@ -9,7 +9,7 @@ ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
 
 
 sys.path.append(ROOT_DIR)
-from collector import DART
+from collector import DART, MarketValueCollector
 
 @pytest.fixture(scope='module')
 def config():
@@ -43,3 +43,10 @@ def test_get_finantial_sheet(dart_collector, corp_name, year, quarter, doctype):
     with open(os.path.join(TEST_DIR, 'data/samsung_2019_1Q.txt')) as f:
         expected = f.readlines()
     assert expected == dart_collector.get_finance_sheet_from_dart(corp_name, year, quarter, doctype)
+
+
+@pytest.mark.parametrize(
+    "stock_code"
+)
+def test_mvc(stock_code):
+    MarketValueCollector(stock_code)

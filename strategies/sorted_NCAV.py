@@ -26,20 +26,20 @@ if __name__ == "__main__":
 
     # NET Asset (=유동자산 - 부채총계)
     rows = []
-    for idx, (corp_name, corp_code) in enumerate(enlisting_corps.items()):
+    for idx, (corp_name, corp_codes) in enumerate(enlisting_corps.items()):
+        dart_code, stock_code = corp_codes.values()
         if idx >= 30:
             break
-        print(idx, corp_name)
+        print(idx, corp_name, corp_codes)
         dart_collector.get_finance_sheet_from_dart(corp_name, 2021, 1, doctype="CFS")
         current_asset = dart_collector.get_asset('유동자산')
         total_liab = dart_collector.get_asset('부채총계')
     
-        mvc = MarketValueCollector(enlisting_corps[corp_name])
+        mvc = MarketValueCollector(stock_code)
         market_value = mvc.get_market_value('market_value')
 
-        row = [corp_name, corp_code, current_asset, total_liab, market_value]
+        row = [corp_name, stock_code, dart_code, current_asset, total_liab, market_value]
         rows.append(row)
-
 
 
     # Save data

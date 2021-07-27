@@ -10,7 +10,6 @@ from zipfile import ZipFile
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
 
-
 COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
 
@@ -98,13 +97,6 @@ class DART(object):
                                                         'stock_code':corp_info['stock_code']}
         return listing_corps
 
-    
-
-    # def search_corp_code(self, corp_name:str) -> str:
-    #     self.cope_code_map[corp_name]
-    #     for element in self.cope_code_map:
-    #         if element['corp_name'] == corp_name:
-    #             return element['corp_code']
 
 
     def get_finance_sheet_from_dart(self, 
@@ -222,7 +214,11 @@ class MarketValueCollector(object):
             return current_price
 
         elif attr == 'n_stocks':
-            q = self.bs_obj.find('th', text='상장주식수').next_sibling.next_sibling
+            print(self.bs_obj)
+            q = self.bs_obj.find('th', text='상장주식수')
+            # print(q)
+            # print(q.next_sibling)
+            #.next_sibling
             q = q.get_text()
             q = int(q.replace(',', ''))
             return q
