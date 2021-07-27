@@ -1,5 +1,6 @@
 import os
 import sys
+from _pytest.mark import param
 import yaml
 import pytest
 
@@ -9,7 +10,7 @@ ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
 
 
 sys.path.append(ROOT_DIR)
-from collector import DART
+from collector import DART, MarketValueCollector
 
 @pytest.fixture(scope='module')
 def config():
@@ -32,14 +33,27 @@ def dart_collector(config):
     ]
     )
 def test_search_corp_code(dart_collector, corp_names, expecteds):
-    assert expecteds == dart_collector.search_corp_code(corp_names)
+    assert expecteds == dart_collector.cope_code_map[corp_names]['dart_code']
 
 
 @pytest.mark.parametrize(
-    "corp_name, year, quarter, doctype",
-    [pytest.param("삼성전자", 2019, 1, "CFS")]
+    "corp_name, year, quarter, doctype, account_name, expected",
+    [pytest.param("삼성전자", 2019, 1, "CFS", "유동자산", 177388524000000)]
 )
-def test_get_finantial_sheet(dart_collector, corp_name, year, quarter, doctype):
-    with open(os.path.join(TEST_DIR, 'data/samsung_2019_1Q.txt')) as f:
-        expected = f.readlines()
-    assert expected == dart_collector.get_finance_sheet_from_dart(corp_name, year, quarter, doctype)
+def test_get_asset(dart_collector, corp_name, year, quarter, doctype, account_name, expected):
+    dart_collector.get_finance_sheet_from_dart(corp_name, year, quarter, doctype)
+    assert expected == dart_collector.get_asset(account_name)
+
+
+@pytest.mark.parametrize(
+    "stock_code, attr, expected",
+    [pytest.param(
+        "010130",
+        "n_stocks",
+        18870000,
+        id="KoreaZinc_N_stock"
+    )]
+)
+def test_get_market_value(stock_code, attr, expected):
+    mvc = MarketValueCollector(stock_code)
+    assert expected == mvc.get_market_value(attr)
