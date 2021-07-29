@@ -137,7 +137,11 @@ class DART(object):
         target_URL = URL + '&'.join(param)
 
         binary_txt = urlopen(target_URL).read()
-        self.account_sets =  json.loads(binary_txt)['list']  # list including dictionary
+        if not 'list' in json.loads(binary_txt).keys():
+            # {"status":"013","message":"조회된 데이타가 없습니다."}
+            return binary_txt
+        else:
+            self.account_sets = json.loads(binary_txt)['list']   # list including dictionary
         
 
     def get_asset(self, asset_name):
@@ -151,14 +155,15 @@ class DART(object):
 
         Return
         ------
-        int: 계정명칭의 보고서내 당기금액
+        int: 계정명칭의 보고서내 당기금액.
+            (못 찾은 경우는 0을 반환)
         '''
         # for each account name (각 계정명에 대해서 자산을 찾음)
         for item in self.account_sets:
             if asset_name == item['account_nm'] :
                 return int(item['thstrm_amount'])
         
-        raise AccountNotFound(f"{asset_name} was not founded in finantial sheet")
+        # raise AccountNotFound(f"{asset_name} was not founded in finantial sheet")
 
 
 
@@ -222,24 +227,3 @@ class MarketValueCollector(object):
         elif attr == 'market_value':
             n_sum = self.get_market_value('price') * self.get_market_value('n_stocks')
             return n_sum
-
-
-
-if __name__ == "__main__":
-    import os
-    import sys
-    import yaml
-    import re
-    import pandas as pd
-    # COLLECTOR_DIR = os.path.dirname(os.getcwd())
-    COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
-    SDAM_DIR = os.path.dirname(COLLECTOR_DIR)
-    
-    
-    # with open(os.path.join(SDAM_DIR, 'config.yaml')) as f:
-        # config = yaml.load(f, Loader=yaml.FullLoader)
-
-    mvc = MarketValueCollector("010130")
-    a = mvc.get_market_value("n_stocks")
-    print(a)
- 

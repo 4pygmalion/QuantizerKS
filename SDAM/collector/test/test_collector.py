@@ -38,7 +38,8 @@ def test_search_corp_code(dart_collector, corp_names, expecteds):
 
 @pytest.mark.parametrize(
     "corp_name, year, quarter, doctype, account_name, expected",
-    [pytest.param("삼성전자", 2019, 1, "CFS", "유동자산", 177388524000000)]
+    [pytest.param("삼성전자", 2019, 1, "CFS", "유동자산", 177388524000000),
+     pytest.param("한국ANKOR유전", 2020, 1, "CFS", "유동자산", 237832)]
 )
 def test_get_asset(dart_collector, corp_name, year, quarter, doctype, account_name, expected):
     dart_collector.get_finance_sheet_from_dart(corp_name, year, quarter, doctype)

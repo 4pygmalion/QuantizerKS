@@ -5,6 +5,7 @@ import yaml
 import pandas as pd
 import time
 
+STRATEGY_DIR = os.getcwd()
 STRATEGY_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(STRATEGY_DIR)
 sys.path.append(ROOT_DIR)
@@ -28,10 +29,12 @@ if __name__ == "__main__":
     rows = []
     for idx, (corp_name, corp_codes) in enumerate(enlisting_corps.items()):
         dart_code, stock_code = corp_codes.values()
-        if idx >= 30:
-            break
-        print(idx, corp_name, corp_codes)
-        dart_collector.get_finance_sheet_from_dart(corp_name, 2021, 1, doctype="CFS")
+        print(corp_name, dart_code, stock_code)
+        
+        error_msg = dart_collector.get_finance_sheet_from_dart(corp_name, 2021, 1, doctype="CFS")
+        if error_msg:
+            continue
+        
         current_asset = dart_collector.get_asset('유동자산')
         total_liab = dart_collector.get_asset('부채총계')
     
@@ -42,7 +45,11 @@ if __name__ == "__main__":
         rows.append(row)
 
 
-    # Save data
-    colnames = ['CorpName', 'Code', 'CurrnetAsset', 'TotalLiab', 'MarketValue']
-    data = pd.DataFrame(rows, columns=colnames)
-    data.to_csv(os.path.join(config['ENV']['SAVE_DIR']), 'ncav.csv', index=False)
+        # Save data
+        colnames = ['CorpName', 'StockCode', 'DartCode', 'CurrnetAsset', 'TotalLiab', 'MarketValue']
+        data = pd.DataFrame(rows, columns=colnames)
+
+        data['NetAsset'] = data['CurrnetAsset'] - data['TotalLiab']
+        data['NetAsset/MarketValue'] = data['NetAsset'] / data['MarketValue']
+        file_name = os.path.join(config['ENV']['SAVE_DIR'], 'ncav.csv')
+        data.to_csv(file_name, index=False)
