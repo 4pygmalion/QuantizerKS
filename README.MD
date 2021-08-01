@@ -14,9 +14,14 @@
 `
 
 ### How to use ?
-`Python 3
-<p> set_key(key="adhub_YOURKEY_...") </p>
-<p> set_save_dir(dir="where to save") </p>
+```
+import yaml
+from SDAM import set_key, set_save_dir
+In [ ]:
+set_key('YOUR_CERTKEY')
+set_save_dir('SAVE_DIR')
+
+```
 
 
 <p> dart = DART(config) </p>
