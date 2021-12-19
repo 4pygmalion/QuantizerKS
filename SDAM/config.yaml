@@ -1,5 +1,5 @@
 DART:
-  KEY: 
+  KEY: b34dba1d3305ded5cf8022dab7ac5fe90c867e8b
   MAPPER:
     1: 11013
     2: 11012
@@ -8,4 +8,4 @@ DART:
 DATA:
   MARKET: data/corp_list.csv
 ENV:
-  SAVE_DIR: 
+  SAVE_DIR: C:\Users\HoHeon\OneDrive\Repositories\QuantizerKS\results
