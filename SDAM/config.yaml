@@ -1,5 +1,5 @@
 DART:
-  KEY: 125494f0d66cc9a1352fe47a74f8c78d4f2ed294
+  KEY: ""
   MAPPER:
     1: 11013
     2: 11012
@@ -8,6 +8,6 @@ DART:
 DATA:
   MARKET: data/corp_list.csv
 ENV:
-  SAVE_DIR: C:\Users\PC\Documents\repository\QuantizerKS\results
+  SAVE_DIR: ""
 EVAL:
   NON_CURRNET_ASSET_DISCOUNT: 0.8
