@@ -31,3 +31,4 @@ print("total_liab:", total_liab)
 - numpy
 - beautifulsoap4
 - xmltodict 
+- requests 

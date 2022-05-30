@@ -11,7 +11,7 @@ def get_logger(name, file_path=None):
 
     if file_path:
         if not os.path.exists(file_path):
-            os.mkdir(os.path.dirname(file_path))
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
         file_handler = logging.FileHandler(file_path)
 
     else:
@@ -20,7 +20,9 @@ def get_logger(name, file_path=None):
         file_handler = logging.FileHandler(os.path.join(LOG_DIR, "log.txt"))
 
     stream_handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     stream_handler.setFormatter(formatter)
     stream_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)

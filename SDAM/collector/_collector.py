@@ -5,7 +5,9 @@ import xmltodict
 import numpy as np
 import pandas as pd
 
+import requests
 from io import BytesIO
+from logging import Logger
 from zipfile import ZipFile
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
@@ -31,25 +33,23 @@ class DART(object):
 
     Example
     -------
-    >>> CRTFC_KEY="7gidszaxcd9qyh4idjosaidj"
-    >>> corp_code="00126380"
-
-    >>> corp_dart = DART(CRTFC_KEY, corp_code)
-    >>> corp_dart.get_finance_sheet(start_date=2020, report_code=11013)
+        >>> corp_dart = DART(config)
+        >>> corp_dart.get_finance_sheet(start_date=2020, report_code=11013)
     """
 
     def __init__(
         self,
         config: dict,
-        logger=None,
+        logger=Logger(__name__),
         is_consolidation=True,
     ):
 
         self.config = config
         self.mapper = config["DART"]["MAPPER"]
         self.logger = logger
-        self.cert = f"crtfc_key={config['DART']['KEY']}"
-        self.cope_code_map = self.get_listed_corp()
+        self.cert_key = config["DART"]["KEY"]
+        self.cope_code_map = dict()
+        self.stock_codes = dict()
         self.is_consolidation = is_consolidation
 
     def _get_corpcode(self) -> list:
@@ -63,35 +63,38 @@ class DART(object):
                         ['corp_name', '다코])
         """
 
-        request_url = "https://opendart.fss.or.kr/api/corpCode.xml?" + self.cert
+        request_url = (
+            "https://opendart.fss.or.kr/api/corpCode.xml?"
+            + "crtfc_key="
+            + self.cert_key
+        )
         xml_zip = urlopen(request_url).read()
         zip_file = ZipFile(BytesIO(xml_zip))
         file = zip_file.namelist()[0]
 
         with zip_file.open(file) as corpcode_xml:
             corp_xml = xmltodict.parse(corpcode_xml.read())
+
         return corp_xml["result"]["list"]
 
-    def get_listed_corp(self, market: list = ["KOSPI", "KOSDAQ"]) -> dict:
-        """상장된 기업의 기업명, 종목코드를 반환합니다.
+    def set_stock_codes(self, market: list = ["KOSPI", "KOSDAQ"]) -> dict:
+        """상장된 기업의 기업명, 종목코드를 인스턴스 변수에 저장합니다.
 
-        Return
-        ------
-        dict: (corp_name, corp_code).
-            corp_name, corp_code are string type.
+        Example:
+            >>> self.set_stock_codes()
+            >>> self.stock_codes
+            {
+                '코리아써키트': {'dart_code': '00152686', 'stock_code': '007810'},
+                '텔레필드': {'dart_code': '00560122', 'stock_code': '091440'}
+            }
 
-        Note
-        ----
-        장외거래시장도 있는 것 같음
         """
 
-        if self.logger:
-            self.logger.info("In process: load codes of listing companies")
+        self.logger.info("In process: load codes of listing companies")
 
-        data = pd.read_csv(
-            os.path.join(COLLECTOR_DIR, self.config["DATA"]["MARKET"]), encoding="cp949"
-        )
-        # data['단축코드'] =
+        stokc_list_path = os.path.join(COLLECTOR_DIR, self.config["DATA"]["MARKET"])
+        data = pd.read_csv(stokc_list_path, encoding="cp949")
+
         data = data.loc[data["시장구분"].isin(market)]
         data["단축코드"] = data["단축코드"].apply(
             lambda x: "{:06}".format((int(x)))
@@ -99,82 +102,160 @@ class DART(object):
             else str(x)
         )
 
-        listing_corps = dict()
         for corp_info in self._get_corpcode():
             if not corp_info["stock_code"]:
                 continue
+
             if corp_info["stock_code"] in list(data["단축코드"]):
-                listing_corps[corp_info["corp_name"]] = {
+                self.stock_codes[corp_info["corp_name"]] = {
                     "dart_code": corp_info["corp_code"],
                     "stock_code": corp_info["stock_code"],
                 }
-        return listing_corps
 
-    def get_finance_sheet_from_dart(
-        self, corp_name: str, year: int, quarter: int, doctype: str = "CFS"
+        return
+
+    def get_finance_sheet(
+        self, dart_code: str, year: int, quarter: int, doctype: str = "CFS"
     ) -> list:
-        """
-        Parameters
-        ----------
-        year: 회계년도.
-        report_code: int.
-            in range from 1, to 4
-        doctype: str.
-            'CFS':  연결재무재표 (Consolidated Finantial Statement)
-            'IS' 손익계산서 (Income statetment)
+        """단일회사의 전체 재무제표를 조회하여 반환함.
 
-        Return
-        ------
-        None
-        """
-        if self.logger:
-            self.logger.info(f"In process: getting finantial sheet of {corp_name}")
+        Args:
+            dart_code (str): 회계 대상의 DART_CODE
+            year (int): 회계년도.
+            quarter (int): 회계년도의 분기
+            doctype (str): 문서타입
+                - 'CFS':  연결재무재표 (Consolidated Finantial Statement)
+                - 'IS' 손익계산서 (Income statetment)
 
-        # Requested parameters
-        corp_code = "corp_code={}".format(self.cope_code_map[corp_name]["dart_code"])
-        bsns_year = "bsns_year={}".format(str(year))
-        report_code = "reprt_code={}".format(self.mapper[quarter])
-        fs_div = "fs_div={}".format(doctype)
+        Example:
+        >>> self.get_finance_sheet("00261285", 2022, 1)
+        [
+            {
+                'rcept_no': '20220516002597',
+                'reprt_code': '11013',
+                'bsns_year': '2022',
+                'corp_code': '00261285',
+                'sj_div': 'BS',
+                'sj_nm': '재무상태표',
+                'account_id': 'ifrs-full_CurrentAssets',
+                'account_nm': '유동자산',
+                'account_detail': '-',
+                'thstrm_nm': '제 40 기 1분기말',
+                'thstrm_amount': '16255251734327',
+                'frmtrm_nm': '제 39 기말',
+                'frmtrm_amount': '13147738252924',
+                'ord': '1',
+                'currency': 'KRW'
+            },
+            {
+                ...
+            }
+        ]
+
+        See Also:
+            https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS003&apiId=2019020
+        """
+
+        self.logger.info(f"In process: getting finantial sheet of {dart_code}")
 
         # URL Type
         if doctype == "CFS":
-            URL = "https://opendart.fss.or.kr/api/fnlttSinglAcntAll.json?"
-            param = [self.cert, corp_code, bsns_year, report_code, fs_div]
+            url = "https://opendart.fss.or.kr/api/fnlttSinglAcntAll.json?"
         elif doctype == "IS":
-            URL = "https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?"
-            param = [self.cert, corp_code, bsns_year, report_code]
-
-        target_URL = URL + "&".join(param)
-
-        binary_txt = urlopen(target_URL).read()
-        if not "list" in json.loads(binary_txt).keys():
-            # {"status":"013","message":"조회된 데이타가 없습니다."}
-            return binary_txt
+            url = "https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?"
         else:
-            self.account_sets = json.loads(binary_txt)[
-                "list"
-            ]  # list including dictionary
+            raise ValueError(f"doctype not expected, given {doctype}")
 
-    def get_asset(self, asset_name):
+        # Requested parameters
+        try:
+            stock_info = requests.get(
+                url,
+                params={
+                    "crtfc_key": self.cert_key,
+                    "corp_code": dart_code,
+                    "bsns_year": year,
+                    "reprt_code": self.mapper[quarter],
+                    "fs_div": doctype,
+                },
+            ).json()
+        except:
+            self.logger.warning(stock_info["message"])
+            return list()
+
+        if stock_info["message"] != "정상":
+            self.logger.warning(stock_info["message"])
+            return list()
+
+        return stock_info["list"]
+
+    def get_assets(self, fs: list, asset_names: set) -> dict:
         """
         계정명칭(예, 유동자산, 유동부채 등)에 해당하는 당기 금액을 반환합니다.
 
-        Parameter
-        ---------
-        asset_name: str. 계정명칭
-            예) "유동자산"
+        Args:
+            fs (list): finantial sheet. nested list
+            asset_names (set): 계정명칭들
 
-        Return
-        ------
-        int: 계정명칭의 보고서내 당기금액.
-            (못 찾은 경우는 0을 반환)
+        Return:
+            int: 계정명칭의 보고서내 당기금액.
+                (못 찾은 경우는 -을 반환)
         """
-        # for each account name (각 계정명에 대해서 자산을 찾음)
-        for item in self.account_sets:
-            if asset_name == item["account_nm"]:
-                return int(item["thstrm_amount"])
+
+        assets = dict()
+        for account_item in fs:
+            if account_item["account_nm"] in asset_names:
+                assets[account_item["account_nm"]] = int(account_item["thstrm_amount"])
+
+        return assets
 
         # raise AccountNotFound(f"{asset_name} was not founded in finantial sheet")
+
+    def get_issued_stocks(self, corp_code: str, year: int, quarter: int) -> int:
+        """분기보고서에 작성된 발행된 주식의 수를 반환합니다.
+
+        Note:
+
+            응답결과
+            result
+                status	에러 및 정보 코드	(※메시지 설명 참조)
+                message	에러 및 정보 메시지	(※메시지 설명 참조)
+            list
+                rcept_no	접수번호	접수번호(14자리)
+                corp_cls	법인구분	법인구분 : Y(유가), K(코스닥), N(코넥스), E(기타)
+                corp_code	고유번호	공시대상회사의 고유번호(8자리)
+                corp_name	회사명	공시대상회사명
+                se	구분	구분(증권의종류, 합계, 비고)
+                isu_stock_totqy	발행할 주식의 총수	Ⅰ. 발행할 주식의 총수, 9,999,999,999
+                now_to_isu_stock_totqy	현재까지 발행한 주식의 총수	Ⅱ. 현재까지 발행한 주식의 총수, 9,999,999,999
+                now_to_dcrs_stock_totqy	현재까지 감소한 주식의 총수	Ⅲ. 현재까지 감소한 주식의 총수, 9,999,999,999
+                redc	감자	Ⅲ. 현재까지 감소한 주식의 총수(1. 감자), 9,999,999,999
+                profit_incnr	이익소각	Ⅲ. 현재까지 감소한 주식의 총수(2. 이익소각), 9,999,999,999
+                rdmstk_repy	상환주식의 상환	Ⅲ. 현재까지 감소한 주식의 총수(3. 상환주식의 상환), 9,999,999,999
+                etc	기타	Ⅲ. 현재까지 감소한 주식의 총수(4. 기타), 9,999,999,999
+                istc_totqy	발행주식의 총수	Ⅳ. 발행주식의 총수 (Ⅱ-Ⅲ), 9,999,999,999
+                tesstk_co	자기주식수	Ⅴ. 자기주식수, 9,999,999,999
+                distb_stock_co	유통주식수	Ⅵ. 유통주식수 (Ⅳ-Ⅴ), 9,999,999,999
+
+        Args:
+            corp_code (str): 공시대상회사의 고유번호 8자리 (공시정보->고유번호)
+
+        """
+
+        stock_info = requests.get(
+            "https://opendart.fss.or.kr/api/stockTotqySttus.json",
+            params={
+                "crtfc_key": self.cert_key,
+                "corp_code": corp_code,
+                "bsns_year": year,
+                "reprt_code": self.mapper[quarter],
+            },
+        ).json()
+
+        if stock_info["message"] != "정상":
+            self.logger.warning(stock_info["message"])
+            return 0
+
+        return int(stock_info["list"][0]["istc_totqy"].replace(",", ""))
 
 
 class MarketValueCollector(object):
