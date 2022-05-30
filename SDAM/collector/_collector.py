@@ -1,8 +1,7 @@
 import os
 import sys
-import json
+import time
 import xmltodict
-import numpy as np
 import pandas as pd
 
 import requests
@@ -178,8 +177,10 @@ class DART(object):
                     "fs_div": doctype,
                 },
             ).json()
+
         except:
-            self.logger.warning(stock_info["message"])
+            self.logger.warning("request fail")
+            time.sleep(3)
             return list()
 
         if stock_info["message"] != "정상":
@@ -208,7 +209,8 @@ class DART(object):
 
         return assets
 
-        # raise AccountNotFound(f"{asset_name} was not founded in finantial sheet")
+    def create_table(self):
+        return
 
     def get_issued_stocks(self, corp_code: str, year: int, quarter: int) -> int:
         """분기보고서에 작성된 발행된 주식의 수를 반환합니다.

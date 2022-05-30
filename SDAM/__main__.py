@@ -37,28 +37,17 @@ if __name__ == "__main__":
     DART_API = DART(CONFIG, logger=LOGGER)
     DART_API.set_stock_codes()
 
-    # print(DART_API.stock_codes)
-    fs = DART_API.get_finance_sheet("00106623", 2021, 1)
-    assets = DART_API.get_assets(fs, {"유동자산", "유동부채", "비유동자산", "비유동부채"})
-    print(assets)
-    # rows = list()
-    # for idx, (
-    #     copr_name,
-    #     code_info,
-    # ) in enumerate(DART_API.stock_codes.items()):
+    rows = list()
+    asset_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
+    for corp_name, corp_codes in DART_API.stock_codes.items():
+        fs = DART_API.get_finance_sheet(corp_codes["dart_code"], 2022, 1)
+        asset_info = DART_API.get_assets(fs, {"유동자산", "유동부채", "비유동자산", "비유동부채"})
 
-    #     if idx >= 100:
-    #         continue
+        row = [asset_info.get(asset_name, 0) for asset_name in asset_names]
+        rows.append(row)
 
-    #     dart_code = code_info["dart_code"]
-    #     fs = DART_API.get_finance_sheet(dart_code, 2022, 1)
-
-    #     if not fs:
-    #         continue
-
-    #     rows.append(list(fs.values()))
-
-    # df = pd.DataFrame(rows)
+    df = pd.DataFrame(rows, columns=list(asset_names))
+    df.to_csv(os.path.join(SAVE_DIR, "dataframe.csv"), index=False)
     # print(df)
     # # for idx, corp_name, corp_code in enumerate(CORP_LIST.items()):
     #     dart_code, stock_code = corp_code.values()
