@@ -48,27 +48,3 @@ if __name__ == "__main__":
 
     df = pd.DataFrame(rows, columns=list(asset_names))
     df.to_csv(os.path.join(SAVE_DIR, "dataframe.csv"), index=False)
-    # print(df)
-    # # for idx, corp_name, corp_code in enumerate(CORP_LIST.items()):
-    #     dart_code, stock_code = corp_code.values()
-    #     error_msg = DART_API.get_finance_sheet_from_dart(
-    #         corp_name, 2022, 1, doctype="CFS"
-    #     )
-    #     if error_msg:
-    #         continue
-
-    #     current_asset = DART_API.get_asset("유동자산")
-    #     non_current_asset = DART_API.get_asset("비유동자산")
-    #     total_liab = DART_API.get_asset("부채총계")
-
-    #     mvc = MarketValueCollector(stock_code)
-    #     market_value = mvc.get_market_value("market_value")
-
-    #     row = [
-    #         corp_name,
-    #         stock_code,
-    #         dart_code,
-    #         current_asset,
-    #         total_liab,
-    #         market_value,
-    #     ]
