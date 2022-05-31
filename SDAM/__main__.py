@@ -37,49 +37,5 @@ if __name__ == "__main__":
     DART_API = DART(CONFIG, logger=LOGGER)
     DART_API.set_stock_codes()
 
-    # print(DART_API.stock_codes)
-    fs = DART_API.get_finance_sheet("00106623", 2021, 1)
-    assets = DART_API.get_assets(fs, {"유동자산", "유동부채", "비유동자산", "비유동부채"})
-    print(assets)
-    # rows = list()
-    # for idx, (
-    #     copr_name,
-    #     code_info,
-    # ) in enumerate(DART_API.stock_codes.items()):
-
-    #     if idx >= 100:
-    #         continue
-
-    #     dart_code = code_info["dart_code"]
-    #     fs = DART_API.get_finance_sheet(dart_code, 2022, 1)
-
-    #     if not fs:
-    #         continue
-
-    #     rows.append(list(fs.values()))
-
-    # df = pd.DataFrame(rows)
-    # print(df)
-    # # for idx, corp_name, corp_code in enumerate(CORP_LIST.items()):
-    #     dart_code, stock_code = corp_code.values()
-    #     error_msg = DART_API.get_finance_sheet_from_dart(
-    #         corp_name, 2022, 1, doctype="CFS"
-    #     )
-    #     if error_msg:
-    #         continue
-
-    #     current_asset = DART_API.get_asset("유동자산")
-    #     non_current_asset = DART_API.get_asset("비유동자산")
-    #     total_liab = DART_API.get_asset("부채총계")
-
-    #     mvc = MarketValueCollector(stock_code)
-    #     market_value = mvc.get_market_value("market_value")
-
-    #     row = [
-    #         corp_name,
-    #         stock_code,
-    #         dart_code,
-    #         current_asset,
-    #         total_liab,
-    #         market_value,
-    #     ]
+    account_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
+    data = DART_API.create_table(account_names, 2022, 1)
