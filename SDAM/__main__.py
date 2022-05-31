@@ -37,14 +37,5 @@ if __name__ == "__main__":
     DART_API = DART(CONFIG, logger=LOGGER)
     DART_API.set_stock_codes()
 
-    rows = list()
-    asset_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
-    for corp_name, corp_codes in DART_API.stock_codes.items():
-        fs = DART_API.get_finance_sheet(corp_codes["dart_code"], 2022, 1)
-        asset_info = DART_API.get_assets(fs, {"유동자산", "유동부채", "비유동자산", "비유동부채"})
-
-        row = [asset_info.get(asset_name, 0) for asset_name in asset_names]
-        rows.append(row)
-
-    df = pd.DataFrame(rows, columns=list(asset_names))
-    df.to_csv(os.path.join(SAVE_DIR, "dataframe.csv"), index=False)
+    account_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
+    data = DART_API.create_table(account_names, 2022, 1)

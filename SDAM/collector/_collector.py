@@ -209,8 +209,17 @@ class DART(object):
 
         return assets
 
-    def create_table(self):
-        return
+    def create_table(self, account_names: set, year: int, quarter: int) -> pd.DataFrame:
+        rows = list()
+
+        for corp_name, corp_codes in self.stock_codes.items():
+            fs = self.get_finance_sheet(corp_codes["dart_code"], year, quarter)
+            asset_info = self.get_assets(fs, {"유동자산", "유동부채", "비유동자산", "비유동부채"})
+
+            row = [asset_info.get(asset_name, 0) for asset_name in account_names]
+            rows.append(row)
+
+        return pd.DataFrame(rows, columns=list(account_names))
 
     def get_issued_stocks(self, corp_code: str, year: int, quarter: int) -> int:
         """분기보고서에 작성된 발행된 주식의 수를 반환합니다.
