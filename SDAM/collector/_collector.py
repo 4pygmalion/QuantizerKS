@@ -214,12 +214,16 @@ class DART(object):
 
         for corp_name, corp_codes in self.stock_codes.items():
             fs = self.get_finance_sheet(corp_codes["dart_code"], year, quarter)
-            asset_info = self.get_assets(fs, {"유동자산", "유동부채", "비유동자산", "비유동부채"})
+            asset_info = self.get_assets(fs, account_names)
 
-            row = [asset_info.get(asset_name, 0) for asset_name in account_names]
+            row = [corp_name, corp_codes["dart_code"]] + [
+                asset_info.get(asset_name, 0) for asset_name in account_names
+            ]
             rows.append(row)
 
-        return pd.DataFrame(rows, columns=list(account_names))
+        columns = ["corp_name", "dart_code"] + list(account_names)
+        dataframe = pd.DataFrame(rows, columns=columns)
+        return dataframe.set_index("dart_code")
 
     def get_issued_stocks(self, corp_code: str, year: int, quarter: int) -> int:
         """분기보고서에 작성된 발행된 주식의 수를 반환합니다.
@@ -266,7 +270,16 @@ class DART(object):
             self.logger.warning(stock_info["message"])
             return 0
 
-        return int(stock_info["list"][0]["istc_totqy"].replace(",", ""))
+        n_stock_issue = stock_info["list"][0]["istc_totqy"].replace(",", "")
+        self.logger.debug(f"{n_stock_issue}: issued stock of corp_code({corp_code})")
+        return int(n_stock_issue)
+
+    def annotate_issued_stock(
+        self, dataframe: pd.DataFrame, year: int, quarter: int
+    ) -> pd.DataFrame:
+
+        self.logger.info("In processing: Annotating issued stocks")
+        dataframe
 
 
 class MarketValueCollector(object):

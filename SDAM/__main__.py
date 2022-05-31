@@ -39,3 +39,12 @@ if __name__ == "__main__":
 
     account_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
     data = DART_API.create_table(account_names, 2022, 1)
+
+    # issued_stocks = dict()
+    # for corp_name, code_info in DART_API.stock_codes.items():
+    #     issued_stocks[code_info["dart_code"]] = DART_API.get_issued_stocks(
+    #         code_info["dart_code"], 2021, 1
+    #     )
+
+    print(data)
+    # print(issued_stocks)
