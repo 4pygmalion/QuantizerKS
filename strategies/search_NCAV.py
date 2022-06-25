@@ -46,7 +46,14 @@ if __name__ == "__main__":
         mvc = MarketValueCollector(stock_code)
         market_value = mvc.get_market_value("market_value")
 
-        row = [corp_name, stock_code, dart_code, current_asset, total_liab, market_value]
+        row = [
+            corp_name,
+            stock_code,
+            dart_code,
+            current_asset,
+            total_liab,
+            market_value,
+        ]
         rows.append(row)
 
         if idx % COMMIT_BATCH == 0:

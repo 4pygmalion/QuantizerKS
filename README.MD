@@ -1,7 +1,7 @@
 ### how to install
 ```bash 
-$ python -m pip install build
-$ python setup.py
+$ cd QuantizerKS/
+$ python3 -m pip install -r requirements.txt
 ```
 
 ### How to use ?
