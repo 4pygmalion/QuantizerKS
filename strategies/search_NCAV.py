@@ -19,7 +19,7 @@ if __name__ == "__main__":
     COMMIT_BATCH = 100
 
     # Set your current environment
-    set_key("YOURKEY")
+    set_key("125494f0d66cc9a1352fe47a74f8c78d4f2ed294")
     set_save_dir(SAVE_DIR)
     with open(os.path.join(ROOT_DIR, "SDAM/config.yaml")) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
