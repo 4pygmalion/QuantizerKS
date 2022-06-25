@@ -8,14 +8,12 @@ import requests
 from io import BytesIO
 from logging import Logger
 from zipfile import ZipFile
-from bs4 import BeautifulSoup
 from urllib.request import urlopen
 
 COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
 
 sys.path.append(ROOT_DIR)
-from error_handler import AccountNotFound
 
 
 class DART(object):
@@ -111,6 +109,7 @@ class DART(object):
                     "stock_code": corp_info["stock_code"],
                 }
 
+        self.logger.info(f"Process completed: {len(self.stock_codes)} collected.")
         return
 
     def get_finance_sheet(
@@ -210,19 +209,46 @@ class DART(object):
         return assets
 
     def create_table(self, account_names: set, year: int, quarter: int) -> pd.DataFrame:
+        """Create Tabular dataform with columns including account_names
+
+        Args:
+            account_names (set): names of account name
+            year (int): fisical year
+            quater (int): fisical quater
+
+        Return:
+            stock_tables (pd.DataFrame): dataframe with index dart_code and
+                columns including acocunt_names
+
+        Example:
+            >>> DART_API = DART(CONFIG, logger=LOGGER)
+            >>> DART_API.set_stock_codes()
+            >>> account_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
+            >>> DART_API.create_table(account_names, 2022, 1)
+            orp_name          유동부채        비유동부채         비유동자산          유동자산
+            dart_code
+            00956028     엑세스바이오     370201176     34423861     121180026     761374506
+            00783246     글로벌에스엠     160606524     71183918     258756994     550811241
+            00800084     씨케이에이치             0            0             0             0
+            01170962        GRT             0            0             0             0
+            00960641      한국패러랠             0            0             0             0
+            ...             ...           ...          ...           ...           ...
+
+        """
         rows = list()
 
         for corp_name, corp_codes in self.stock_codes.items():
             fs = self.get_finance_sheet(corp_codes["dart_code"], year, quarter)
             asset_info = self.get_assets(fs, account_names)
 
-            row = [corp_name, corp_codes["dart_code"]] + [
+            row = [corp_name, corp_codes["stock_code"], corp_codes["dart_code"]] + [
                 asset_info.get(asset_name, 0) for asset_name in account_names
             ]
             rows.append(row)
 
-        columns = ["corp_name", "dart_code"] + list(account_names)
+        columns = ["corp_name", "stock_code", "dart_code"] + list(account_names)
         dataframe = pd.DataFrame(rows, columns=columns)
+
         return dataframe.set_index("dart_code")
 
     def get_issued_stocks(self, corp_code: str, year: int, quarter: int) -> int:
@@ -273,71 +299,3 @@ class DART(object):
         n_stock_issue = stock_info["list"][0]["istc_totqy"].replace(",", "")
         self.logger.debug(f"{n_stock_issue}: issued stock of corp_code({corp_code})")
         return int(n_stock_issue)
-
-    def annotate_issued_stock(
-        self, dataframe: pd.DataFrame, year: int, quarter: int
-    ) -> pd.DataFrame:
-
-        self.logger.info("In processing: Annotating issued stocks")
-        dataframe
-
-
-class MarketValueCollector(object):
-    """Market Value Data collecter from NAVER finance
-
-    Parameters
-    ----------
-    corp_code: '014680'
-    """
-
-    def __init__(self, corp_code: str):
-        self.corp_code = corp_code
-        self.bs_obj = self._get_html()
-
-        if self._check_redirection():
-            raise ValueError("Ticker not existed")
-
-    def _check_redirection(self):
-        """To check rediction due to not existing ticker
-
-        return
-        ------
-        bool
-        """
-        return self.bs_obj.find("title").get_text() == "네이버 :: 세상의 모든 지식, 네이버"
-
-    def _get_html(self):
-        """Get html from naver stock using BS4"""
-
-        URL = "https://finance.naver.com/item/main.nhn?code={}".format(self.corp_code)
-        res = urlopen(URL).read().decode("cp949")
-        bs_obj = BeautifulSoup(res, "html.parser")
-
-        return bs_obj
-
-    def get_market_value(self, attr: str) -> int:
-        """
-        Parameters
-        ----------
-            attr: str.
-                'price': 현재가격
-                'n_stock': 발행주식수
-                'market_value': 시가총액
-        """
-        if attr == "price":
-            market_sum = self.bs_obj.find("p", attrs={"class": "no_today"})
-            spans = market_sum.find_all("span")[1:]
-            csv = [tag.get_text() for tag in spans]
-            current_price = "".join(csv)
-            current_price = int(current_price.replace(",", ""))
-            return current_price
-
-        elif attr == "n_stocks":
-            div = self.bs_obj.find("table", attrs={"summary": "시가총액 정보"})
-            values = div.text.split("\n")
-            n_stock = values[values.index("상장주식수") + 1]
-            return int(n_stock.replace(",", ""))
-
-        elif attr == "market_value":
-            n_sum = self.get_market_value("price") * self.get_market_value("n_stocks")
-            return n_sum
