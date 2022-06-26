@@ -5,6 +5,9 @@ DART:
     2: 11012
     3: 11014
     4: 11011
+COLLECTOR:
+  FILE:
+    KR2ENG: "kr2eng.txt"
 DATA:
   MARKET: data/corp_list.csv
 ENV:

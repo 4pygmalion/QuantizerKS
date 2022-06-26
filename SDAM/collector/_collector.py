@@ -12,7 +12,6 @@ from urllib.request import urlopen
 
 COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
-
 sys.path.append(ROOT_DIR)
 
 
@@ -49,6 +48,23 @@ class DART(object):
         self.stock_codes = dict()
         self.is_consolidation = is_consolidation
 
+    def set_translation_dict(self) -> None:
+        self.translation_dict = dict()
+
+        mapping_file_path = os.path.join(
+            COLLECTOR_DIR, self.config["COLLECTOR"]["FILE"]["KR2ENG"]
+        )
+        with open(
+            mapping_file_path,
+            "r",
+            encoding="UTF-8",
+        ) as fh:
+            for line in fh:
+                kr, en = line.strip().split(":")
+                self.translation_dict[kr] = en
+
+        return
+
     def _get_corpcode(self) -> list:
         """Get XML file from DART API and parse it
 
@@ -74,7 +90,7 @@ class DART(object):
 
         return corp_xml["result"]["list"]
 
-    def set_stock_codes(self, market: list = ["KOSPI", "KOSDAQ"]) -> dict:
+    def set_stock_codes(self, market: list = ["KOSPI", "KOSDAQ"]) -> None:
         """상장된 기업의 기업명, 종목코드를 인스턴스 변수에 저장합니다.
 
         Example:
@@ -208,49 +224,6 @@ class DART(object):
 
         return assets
 
-    def create_table(self, account_names: set, year: int, quarter: int) -> pd.DataFrame:
-        """Create Tabular dataform with columns including account_names
-
-        Args:
-            account_names (set): names of account name
-            year (int): fisical year
-            quater (int): fisical quater
-
-        Return:
-            stock_tables (pd.DataFrame): dataframe with index dart_code and
-                columns including acocunt_names
-
-        Example:
-            >>> DART_API = DART(CONFIG, logger=LOGGER)
-            >>> DART_API.set_stock_codes()
-            >>> account_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
-            >>> DART_API.create_table(account_names, 2022, 1)
-            orp_name          유동부채        비유동부채         비유동자산          유동자산
-            dart_code
-            00956028     엑세스바이오     370201176     34423861     121180026     761374506
-            00783246     글로벌에스엠     160606524     71183918     258756994     550811241
-            00800084     씨케이에이치             0            0             0             0
-            01170962        GRT             0            0             0             0
-            00960641      한국패러랠             0            0             0             0
-            ...             ...           ...          ...           ...           ...
-
-        """
-        rows = list()
-
-        for corp_name, corp_codes in self.stock_codes.items():
-            fs = self.get_finance_sheet(corp_codes["dart_code"], year, quarter)
-            asset_info = self.get_assets(fs, account_names)
-
-            row = [corp_name, corp_codes["stock_code"], corp_codes["dart_code"]] + [
-                asset_info.get(asset_name, 0) for asset_name in account_names
-            ]
-            rows.append(row)
-
-        columns = ["corp_name", "stock_code", "dart_code"] + list(account_names)
-        dataframe = pd.DataFrame(rows, columns=columns)
-
-        return dataframe.set_index("dart_code")
-
     def get_issued_stocks(self, corp_code: str, year: int, quarter: int) -> int:
         """분기보고서에 작성된 발행된 주식의 수를 반환합니다.
 
@@ -299,3 +272,50 @@ class DART(object):
         n_stock_issue = stock_info["list"][0]["istc_totqy"].replace(",", "")
         self.logger.debug(f"{n_stock_issue}: issued stock of corp_code({corp_code})")
         return int(n_stock_issue)
+
+    def create_table(self, account_names: set, year: int, quarter: int) -> pd.DataFrame:
+        """Create Tabular dataform with columns including account_names
+
+        Args:
+            account_names (set): names of account name
+            year (int): fisical year
+            quater (int): fisical quater
+
+        Return:
+            stock_tables (pd.DataFrame): dataframe with index dart_code and
+                columns including acocunt_names
+
+        Example:
+            >>> DART_API = DART(CONFIG, logger=LOGGER)
+            >>> DART_API.set_stock_codes()
+            >>> account_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
+            >>> DART_API.create_table(account_names, 2022, 1)
+            orp_name          유동부채        비유동부채         비유동자산          유동자산
+            dart_code
+            00956028     엑세스바이오     370201176     34423861     121180026     761374506
+            00783246     글로벌에스엠     160606524     71183918     258756994     550811241
+            00800084     씨케이에이치             0            0             0             0
+            01170962        GRT             0            0             0             0
+            00960641      한국패러랠             0            0             0             0
+            ...             ...           ...          ...           ...           ...
+
+        """
+        self.set_stock_codes()
+        self.set_translation_dict()
+        rows = list()
+
+        for corp_name, corp_codes in self.stock_codes.items():
+            fs = self.get_finance_sheet(corp_codes["dart_code"], year, quarter)
+            print(fs)
+            asset_info = self.get_assets(fs, account_names)
+
+            row = [corp_name, corp_codes["stock_code"], corp_codes["dart_code"]]
+            row += [asset_info.get(asset_name, 0) for asset_name in account_names]
+            rows.append(row)
+
+        columns = ["corp_name", "stock_code", "dart_code"]
+
+        columns += [self.translation_dict[asset_name] for asset_name in account_names]
+        dataframe = pd.DataFrame(rows, columns=columns)
+
+        return dataframe.set_index("dart_code")

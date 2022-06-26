@@ -13,6 +13,7 @@ sys.path.append(ROOT_DIR)
 from utils import get_logger
 from SDAM.collector import DART
 from annotator import Annotator
+from strategies.strategy import Indicator
 
 
 def get_args() -> argparse.Namespace:
@@ -42,19 +43,27 @@ if __name__ == "__main__":
     os.makedirs(RESULT_DIR, exist_ok=True)
 
     LOGGER = get_logger("MAIN", file_path=os.path.join(LOG_DIR, "main.log"))
-    DART_API = DART(CONFIG, logger=LOGGER)
-    DART_API.set_stock_codes()
+    # DART_API = DART(CONFIG, logger=LOGGER)
+    # DART_API.set_stock_codes()
 
-    account_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
-    data = DART_API.create_table(account_names, 2022, 1)
+    # account_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
+    # data = DART_API.create_table(account_names, 2022, 1)
+    # data.to_csv(os.path.join(RESULT_DIR, "finance_table.csv"))
 
-    data.to_csv(os.path.join(RESULT_DIR, "finance_table.csv"))
+    # table = pd.read_csv(os.path.join(RESULT_DIR, "finance_table.csv"), encoding="utf-8")
+    # table.set_index("stock_code", inplace=True)
 
-    table = pd.read_csv(os.path.join(RESULT_DIR, "finance_table.csv"), encoding="utf-8")
-    table.set_index("stock_code", inplace=True)
+    # annotator = Annotator(LOGGER)
+    # table = annotator.annotate(table)
+    # table.to_csv(
+    #     os.path.join(RESULT_DIR, "price_annotated_table.csv"), encoding="utf-8"
+    # )
 
-    annotator = Annotator(LOGGER)
-    table = annotator.annotate(table)
-    table.to_csv(
-        os.path.join(RESULT_DIR, "price_annotated_table.csv"), encoding="utf-8"
-    )
+    # table = pd.read_csv(
+    #     os.path.join(RESULT_DIR, "price_annotated_table.csv"), encoding="utf-8"
+    # )
+    # table.set_index("stock_code", inplace=True)
+
+    # indicator = Indicator(LOGGER)
+    # indicator.indicate(table)
+    # table.to_csv(os.path.join(RESULT_DIR, "indicated_table.csv"), encoding="utf-8")
