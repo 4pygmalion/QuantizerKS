@@ -273,11 +273,11 @@ class DART(object):
         self.logger.debug(f"{n_stock_issue}: issued stock of corp_code({corp_code})")
         return int(n_stock_issue)
 
-    def create_table(self, account_names: set, year: int, quarter: int) -> pd.DataFrame:
+    def create_table(self, account_names: list, year: int, quarter: int) -> pd.DataFrame:
         """Create Tabular dataform with columns including account_names
 
         Args:
-            account_names (set): names of account name
+            account_names (list): names of account name
             year (int): fisical year
             quater (int): fisical quater
 
@@ -288,7 +288,7 @@ class DART(object):
         Example:
             >>> DART_API = DART(CONFIG, logger=LOGGER)
             >>> DART_API.set_stock_codes()
-            >>> account_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
+            >>> account_names = ["유동자산", "유동부채", "비유동자산", "비유동부채"]
             >>> DART_API.create_table(account_names, 2022, 1)
             orp_name          유동부채        비유동부채         비유동자산          유동자산
             dart_code
@@ -302,20 +302,21 @@ class DART(object):
         """
         self.set_stock_codes()
         self.set_translation_dict()
+
+        hashed_account_names = set(account_names)
         rows = list()
 
         for corp_name, corp_codes in self.stock_codes.items():
             fs = self.get_finance_sheet(corp_codes["dart_code"], year, quarter)
-            print(fs)
-            asset_info = self.get_assets(fs, account_names)
+            asset_info = self.get_assets(fs, hashed_account_names)
 
             row = [corp_name, corp_codes["stock_code"], corp_codes["dart_code"]]
             row += [asset_info.get(asset_name, 0) for asset_name in account_names]
             rows.append(row)
 
-        columns = ["corp_name", "stock_code", "dart_code"]
+        columns = ["CORP_NAME", "STOCK_CODE", "DART_CODE"]
 
         columns += [self.translation_dict[asset_name] for asset_name in account_names]
         dataframe = pd.DataFrame(rows, columns=columns)
 
-        return dataframe.set_index("dart_code")
+        return dataframe.set_index("STOCK_CODE")
