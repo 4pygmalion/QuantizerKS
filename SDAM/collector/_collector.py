@@ -8,14 +8,11 @@ import requests
 from io import BytesIO
 from logging import Logger
 from zipfile import ZipFile
-from bs4 import BeautifulSoup
 from urllib.request import urlopen
 
 COLLECTOR_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(COLLECTOR_DIR)
-
 sys.path.append(ROOT_DIR)
-from error_handler import AccountNotFound
 
 
 class DART(object):
@@ -51,6 +48,23 @@ class DART(object):
         self.stock_codes = dict()
         self.is_consolidation = is_consolidation
 
+    def set_translation_dict(self) -> None:
+        self.translation_dict = dict()
+
+        mapping_file_path = os.path.join(
+            COLLECTOR_DIR, self.config["COLLECTOR"]["FILE"]["KR2ENG"]
+        )
+        with open(
+            mapping_file_path,
+            "r",
+            encoding="UTF-8",
+        ) as fh:
+            for line in fh:
+                kr, en = line.strip().split(":")
+                self.translation_dict[kr] = en
+
+        return
+
     def _get_corpcode(self) -> list:
         """Get XML file from DART API and parse it
 
@@ -76,7 +90,7 @@ class DART(object):
 
         return corp_xml["result"]["list"]
 
-    def set_stock_codes(self, market: list = ["KOSPI", "KOSDAQ"]) -> dict:
+    def set_stock_codes(self, market: list = ["KOSPI", "KOSDAQ"]) -> None:
         """상장된 기업의 기업명, 종목코드를 인스턴스 변수에 저장합니다.
 
         Example:
@@ -111,6 +125,7 @@ class DART(object):
                     "stock_code": corp_info["stock_code"],
                 }
 
+        self.logger.info(f"Process completed: {len(self.stock_codes)} collected.")
         return
 
     def get_finance_sheet(
@@ -155,7 +170,7 @@ class DART(object):
             https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS003&apiId=2019020
         """
 
-        self.logger.info(f"In process: getting finantial sheet of {dart_code}")
+        self.logger.debug(f"In process: getting finantial sheet of {dart_code}")
 
         # URL Type
         if doctype == "CFS":
@@ -179,12 +194,12 @@ class DART(object):
             ).json()
 
         except:
-            self.logger.warning("request fail")
+            self.logger.debug("request fail")
             time.sleep(3)
             return list()
 
         if stock_info["message"] != "정상":
-            self.logger.warning(stock_info["message"])
+            self.logger.debug(stock_info["message"])
             return list()
 
         return stock_info["list"]
@@ -209,27 +224,10 @@ class DART(object):
 
         return assets
 
-    def create_table(self, account_names: set, year: int, quarter: int) -> pd.DataFrame:
-        rows = list()
-
-        for corp_name, corp_codes in self.stock_codes.items():
-            fs = self.get_finance_sheet(corp_codes["dart_code"], year, quarter)
-            asset_info = self.get_assets(fs, account_names)
-
-            row = [corp_name, corp_codes["dart_code"]] + [
-                asset_info.get(asset_name, 0) for asset_name in account_names
-            ]
-            rows.append(row)
-
-        columns = ["corp_name", "dart_code"] + list(account_names)
-        dataframe = pd.DataFrame(rows, columns=columns)
-        return dataframe.set_index("dart_code")
-
     def get_issued_stocks(self, corp_code: str, year: int, quarter: int) -> int:
         """분기보고서에 작성된 발행된 주식의 수를 반환합니다.
 
         Note:
-
             응답결과
             result
                 status	에러 및 정보 코드	(※메시지 설명 참조)
@@ -251,93 +249,93 @@ class DART(object):
                 tesstk_co	자기주식수	Ⅴ. 자기주식수, 9,999,999,999
                 distb_stock_co	유통주식수	Ⅵ. 유통주식수 (Ⅳ-Ⅴ), 9,999,999,999
 
+            일부 회사들에서는 분기보고서에서는 발행된 주식의 수를 작성하지 않음(예, 코스맥스)
         Args:
             corp_code (str): 공시대상회사의 고유번호 8자리 (공시정보->고유번호)
 
         """
 
-        stock_info = requests.get(
-            "https://opendart.fss.or.kr/api/stockTotqySttus.json",
-            params={
-                "crtfc_key": self.cert_key,
-                "corp_code": corp_code,
-                "bsns_year": year,
-                "reprt_code": self.mapper[quarter],
-            },
-        ).json()
+        try:
+            response = requests.get(
+                "https://opendart.fss.or.kr/api/stockTotqySttus.json",
+                params={
+                    "crtfc_key": self.cert_key,
+                    "corp_code": corp_code,
+                    "bsns_year": year,
+                    "reprt_code": self.mapper[quarter],
+                },
+            )
+            self.logger.debug("End of processing: request URL:" + response.url)
+        except:
+            self.logger.debug("Failed process: request URL:" + response.url)
+            time.sleep(3)
+            return 0
+
+        stock_info = response.json()
 
         if stock_info["message"] != "정상":
-            self.logger.warning(stock_info["message"])
+            self.logger.debug(
+                f"Encounting unexpected return from DART API: corp_code({corp_code})"
+                + stock_info["message"]
+            )
             return 0
 
         n_stock_issue = stock_info["list"][0]["istc_totqy"].replace(",", "")
         self.logger.debug(f"{n_stock_issue}: issued stock of corp_code({corp_code})")
-        return int(n_stock_issue)
 
-    def annotate_issued_stock(
-        self, dataframe: pd.DataFrame, year: int, quarter: int
+        return int(n_stock_issue) if n_stock_issue != "-" else 0
+
+    def create_table(
+        self, account_names: list, year: int, quarter: int
     ) -> pd.DataFrame:
+        """Create data table with columns including passed account_names
 
-        self.logger.info("In processing: Annotating issued stocks")
-        dataframe
+        Args:
+            account_names (list): names of account name
+            year (int): fisical year
+            quater (int): fisical quater
 
+        Return:
+            stock_tables (pd.DataFrame): dataframe with index dart_code and
+                columns including acocunt_names
 
-class MarketValueCollector(object):
-    """Market Value Data collecter from NAVER finance
+        Example:
+            >>> DART_API = DART(CONFIG, logger=LOGGER)
+            >>> DART_API.set_stock_codes()
+            >>> account_names = ["유동자산", "유동부채", "비유동자산", "비유동부채"]
+            >>> DART_API.create_table(account_names, 2022, 1)
+            orp_name          유동부채        비유동부채         비유동자산          유동자산
+            dart_code
+            00956028     엑세스바이오     370201176     34423861     121180026     761374506
+            00783246     글로벌에스엠     160606524     71183918     258756994     550811241
+            00800084     씨케이에이치             0            0             0             0
+            01170962        GRT             0            0             0             0
+            00960641      한국패러랠             0            0             0             0
+            ...             ...           ...          ...           ...           ...
 
-    Parameters
-    ----------
-    corp_code: '014680'
-    """
-
-    def __init__(self, corp_code: str):
-        self.corp_code = corp_code
-        self.bs_obj = self._get_html()
-
-        if self._check_redirection():
-            raise ValueError("Ticker not existed")
-
-    def _check_redirection(self):
-        """To check rediction due to not existing ticker
-
-        return
-        ------
-        bool
         """
-        return self.bs_obj.find("title").get_text() == "네이버 :: 세상의 모든 지식, 네이버"
+        self.set_stock_codes()
+        self.set_translation_dict()
 
-    def _get_html(self):
-        """Get html from naver stock using BS4"""
+        hashed_account_names = set(account_names)
+        rows = list()
 
-        URL = "https://finance.naver.com/item/main.nhn?code={}".format(self.corp_code)
-        res = urlopen(URL).read().decode("cp949")
-        bs_obj = BeautifulSoup(res, "html.parser")
+        for corp_name, corp_code_info in self.stock_codes.items():
 
-        return bs_obj
+            dart_code = corp_code_info["dart_code"]
+            krx_code = corp_code_info["stock_code"]
 
-    def get_market_value(self, attr: str) -> int:
-        """
-        Parameters
-        ----------
-            attr: str.
-                'price': 현재가격
-                'n_stock': 발행주식수
-                'market_value': 시가총액
-        """
-        if attr == "price":
-            market_sum = self.bs_obj.find("p", attrs={"class": "no_today"})
-            spans = market_sum.find_all("span")[1:]
-            csv = [tag.get_text() for tag in spans]
-            current_price = "".join(csv)
-            current_price = int(current_price.replace(",", ""))
-            return current_price
+            fs = self.get_finance_sheet(dart_code, year, quarter)
+            asset_info = self.get_assets(fs, hashed_account_names)
 
-        elif attr == "n_stocks":
-            div = self.bs_obj.find("table", attrs={"summary": "시가총액 정보"})
-            values = div.text.split("\n")
-            n_stock = values[values.index("상장주식수") + 1]
-            return int(n_stock.replace(",", ""))
+            row = [corp_name, krx_code, dart_code]
+            row += [asset_info.get(asset_name, 0) for asset_name in account_names]
+            row += [self.get_issued_stocks(dart_code, year, quarter)]
+            rows.append(row)
 
-        elif attr == "market_value":
-            n_sum = self.get_market_value("price") * self.get_market_value("n_stocks")
-            return n_sum
+        columns = ["CORP_NAME", "KRX_CODE", "DART_CODE"]
+        columns += [self.translation_dict[asset_name] for asset_name in account_names]
+        columns += ["ISSUED_STOCK"]
+
+        self.logger.info("End process: create_table.")
+        return pd.DataFrame(rows, columns=columns).set_index("KRX_CODE")

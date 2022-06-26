@@ -1,4 +1,4 @@
-### how to install
+### How to install
 ```bash 
 $ cd QuantizerKS/
 $ python3 -m pip install -r requirements.txt

@@ -7,8 +7,7 @@ LOG_DIR = os.path.join(ROOT_DIR, "log")
 
 def get_logger(name, file_path=None):
     logger = logging.getLogger(name=name)
-    logger.setLevel(logging.INFO)
-
+    logger.setLevel("DEBUG")
     if file_path:
         if not os.path.exists(file_path):
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -25,6 +24,7 @@ def get_logger(name, file_path=None):
     )
     stream_handler.setFormatter(formatter)
     stream_handler.setLevel(logging.INFO)
+
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.DEBUG)
     logger.addHandler(stream_handler)
