@@ -16,6 +16,9 @@ class Annotator:
         self.finantial_crawler = FinancialDataCrawler(logger)
 
     def annotate(self, table: pd.DataFrame) -> pd.DataFrame:
+
+        self.logger.info("In processing: Annotation of stock price.")
+
         if table.index.name is None:
             ValueError("Expected table with index, passed not set-index table")
 
@@ -24,5 +27,7 @@ class Annotator:
             stock_code = row.name
             prices.append(self.finantial_crawler.get_stock_price(stock_code))
 
-        table["stock_price"] = prices
+        table["STOCK_PRICE"] = prices
+
+        self.logger.info("End of processing: Annotation of stock price.")
         return table

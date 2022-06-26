@@ -41,7 +41,7 @@ class FinancialDataCrawler(object):
         return bs_obj
 
     def get_stock_price(self, corp_code: str) -> int:
-        self.logger.info(f"In processing: {corp_code} stock_price crawling")
+        self.logger.debug(f"In processing: {corp_code} stock_price crawling")
 
         try:
             bs4_obj = self.get_bs4_obj(corp_code)
@@ -59,5 +59,5 @@ class FinancialDataCrawler(object):
             return current_price
 
         except:
-            self.logger.warning(f"{corp_code} was not parsed")
+            self.logger.debug(f"{corp_code} was not parsed")
             return 0

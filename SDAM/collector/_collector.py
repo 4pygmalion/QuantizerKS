@@ -170,7 +170,7 @@ class DART(object):
             https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS003&apiId=2019020
         """
 
-        self.logger.info(f"In process: getting finantial sheet of {dart_code}")
+        self.logger.debug(f"In process: getting finantial sheet of {dart_code}")
 
         # URL Type
         if doctype == "CFS":
@@ -194,12 +194,12 @@ class DART(object):
             ).json()
 
         except:
-            self.logger.warning("request fail")
+            self.logger.debug("request fail")
             time.sleep(3)
             return list()
 
         if stock_info["message"] != "정상":
-            self.logger.warning(stock_info["message"])
+            self.logger.debug(stock_info["message"])
             return list()
 
         return stock_info["list"]
@@ -228,7 +228,6 @@ class DART(object):
         """분기보고서에 작성된 발행된 주식의 수를 반환합니다.
 
         Note:
-
             응답결과
             result
                 status	에러 및 정보 코드	(※메시지 설명 참조)
@@ -250,34 +249,49 @@ class DART(object):
                 tesstk_co	자기주식수	Ⅴ. 자기주식수, 9,999,999,999
                 distb_stock_co	유통주식수	Ⅵ. 유통주식수 (Ⅳ-Ⅴ), 9,999,999,999
 
+            일부 회사들에서는 분기보고서에서는 발행된 주식의 수를 작성하지 않음(예, 코스맥스)
         Args:
             corp_code (str): 공시대상회사의 고유번호 8자리 (공시정보->고유번호)
 
         """
 
-        stock_info = requests.get(
-            "https://opendart.fss.or.kr/api/stockTotqySttus.json",
-            params={
-                "crtfc_key": self.cert_key,
-                "corp_code": corp_code,
-                "bsns_year": year,
-                "reprt_code": self.mapper[quarter],
-            },
-        ).json()
+        try:
+            response = requests.get(
+                "https://opendart.fss.or.kr/api/stockTotqySttus.json",
+                params={
+                    "crtfc_key": self.cert_key,
+                    "corp_code": corp_code,
+                    "bsns_year": year,
+                    "reprt_code": self.mapper[quarter],
+                },
+            )
+            self.logger.debug("End of processing: request URL:" + response.url)
+        except:
+            self.logger.debug("Failed process: request URL:" + response.url)
+            time.sleep(3)
+            return 0
+
+        stock_info = response.json()
 
         if stock_info["message"] != "정상":
-            self.logger.warning(stock_info["message"])
+            self.logger.debug(
+                f"Encounting unexpected return from DART API: corp_code({corp_code})"
+                + stock_info["message"]
+            )
             return 0
 
         n_stock_issue = stock_info["list"][0]["istc_totqy"].replace(",", "")
         self.logger.debug(f"{n_stock_issue}: issued stock of corp_code({corp_code})")
-        return int(n_stock_issue)
 
-    def create_table(self, account_names: set, year: int, quarter: int) -> pd.DataFrame:
-        """Create Tabular dataform with columns including account_names
+        return int(n_stock_issue) if n_stock_issue != "-" else 0
+
+    def create_table(
+        self, account_names: list, year: int, quarter: int
+    ) -> pd.DataFrame:
+        """Create data table with columns including passed account_names
 
         Args:
-            account_names (set): names of account name
+            account_names (list): names of account name
             year (int): fisical year
             quater (int): fisical quater
 
@@ -288,7 +302,7 @@ class DART(object):
         Example:
             >>> DART_API = DART(CONFIG, logger=LOGGER)
             >>> DART_API.set_stock_codes()
-            >>> account_names = {"유동자산", "유동부채", "비유동자산", "비유동부채"}
+            >>> account_names = ["유동자산", "유동부채", "비유동자산", "비유동부채"]
             >>> DART_API.create_table(account_names, 2022, 1)
             orp_name          유동부채        비유동부채         비유동자산          유동자산
             dart_code
@@ -302,20 +316,26 @@ class DART(object):
         """
         self.set_stock_codes()
         self.set_translation_dict()
+
+        hashed_account_names = set(account_names)
         rows = list()
 
-        for corp_name, corp_codes in self.stock_codes.items():
-            fs = self.get_finance_sheet(corp_codes["dart_code"], year, quarter)
-            print(fs)
-            asset_info = self.get_assets(fs, account_names)
+        for corp_name, corp_code_info in self.stock_codes.items():
 
-            row = [corp_name, corp_codes["stock_code"], corp_codes["dart_code"]]
+            dart_code = corp_code_info["dart_code"]
+            krx_code = corp_code_info["stock_code"]
+
+            fs = self.get_finance_sheet(dart_code, year, quarter)
+            asset_info = self.get_assets(fs, hashed_account_names)
+
+            row = [corp_name, krx_code, dart_code]
             row += [asset_info.get(asset_name, 0) for asset_name in account_names]
+            row += [self.get_issued_stocks(dart_code, year, quarter)]
             rows.append(row)
 
-        columns = ["corp_name", "stock_code", "dart_code"]
-
+        columns = ["CORP_NAME", "KRX_CODE", "DART_CODE"]
         columns += [self.translation_dict[asset_name] for asset_name in account_names]
-        dataframe = pd.DataFrame(rows, columns=columns)
+        columns += ["ISSUED_STOCK"]
 
-        return dataframe.set_index("dart_code")
+        self.logger.info("End process: create_table.")
+        return pd.DataFrame(rows, columns=columns).set_index("KRX_CODE")
